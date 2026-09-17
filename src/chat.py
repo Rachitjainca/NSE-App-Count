@@ -36,6 +36,8 @@ def build_message(
         lines.append(f"  • Shares offered: {_fmt_num(retail.shares_offered)}")
         if retail_applications is not None:
             lines.append(f"  • Est. applications: {_fmt_num(retail_applications)}")
+        if snapshot.cutoff_shares_bid is not None:
+            lines.append(f"  • Bid at cut-off (incl. employees): {_fmt_num(snapshot.cutoff_shares_bid)}")
         lines.append("")
 
     lines.append("*All categories*")

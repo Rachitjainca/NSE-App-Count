@@ -24,6 +24,7 @@ HEADER = [
     "shares_bid",
     "subscription_times",
     "est_applications",
+    "cutoff_shares_bid",
 ]
 
 

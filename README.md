@@ -20,7 +20,7 @@ Data sources:
 | [src/sheets.py](src/sheets.py) | Appends rows to Google Sheets via a service account |
 | [src/chat.py](src/chat.py) | Builds and posts the Google Chat webhook message |
 | [src/main.py](src/main.py) | Orchestration and configuration |
-| [.github/workflows/nse-ipo-demand.yml](.github/workflows/nse-ipo-demand.yml) | 15-minute cron schedule |
+| [.github/workflows/nse-ipo-demand.yml](.github/workflows/nse-ipo-demand.yml) | 15-minute cron during the IST bidding window |
 
 ## Required repository secrets
 
@@ -58,10 +58,15 @@ Set under `Settings → Secrets and variables → Actions → Variables`:
 ## Sheet columns
 
 `fetched_at_ist`, `symbol`, `company`, `nse_update_time`, `sr_no`, `category`,
-`shares_offered`, `shares_bid`, `subscription_times`, `est_applications`
+`shares_offered`, `shares_bid`, `subscription_times`, `est_applications`,
+`cutoff_shares_bid`
 
 One row per category (including NSE's sub-categories such as `2.1`, `1(a)`). The
 header row is written automatically on first run.
+
+`cutoff_shares_bid` is the aggregate quantity bid at cut-off price. NSE publishes no
+per-category price ladder, so there is no retail-specific bid price; only retail and
+employees may bid at cut-off, making this a close proxy for retail demand.
 
 ## Run locally
 
@@ -86,6 +91,9 @@ can dry-run the fetch on its own.
 
 - GitHub's scheduled runners are best-effort; a `*/15` cron can drift by several
   minutes under load.
+- The schedule runs every 15 minutes between 09:00 and 19:00 IST on weekdays
+  (`*/15 3-13 * * 1-5` in UTC), matching NSE's bidding window. Use **Run workflow**
+  for an off-schedule run.
 - NSE occasionally rate-limits; the client warms up cookies and retries three times.
 - `est_applications` is an estimate (retail shares bid ÷ lot size) and is only filled
   in when `RETAIL_LOT_SIZE` is configured.

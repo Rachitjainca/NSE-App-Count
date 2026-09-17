@@ -47,6 +47,7 @@ def build_rows(
                 row.shares_bid if row.shares_bid is not None else "",
                 row.subscription_times if row.subscription_times is not None else "",
                 round(applications) if applications is not None else "",
+                snapshot.cutoff_shares_bid if snapshot.cutoff_shares_bid is not None else "",
             ]
         )
     return rows
@@ -87,7 +88,11 @@ def main() -> int:
         )
         chat.post_message(
             webhook,
-            chat.build_message(snapshot, fetched_at, applications),
+            chat.build_message(
+                snapshot,
+                fetched_at,
+                round(applications) if applications is not None else None,
+            ),
             thread_key=_env("GCHAT_THREAD_KEY") or None,
         )
         print("Posted update to Google Chat space.")

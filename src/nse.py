@@ -49,6 +49,7 @@ class DemandSnapshot:
     company: str
     update_time: str
     total_shares_bid: float | None
+    cutoff_shares_bid: float | None = None
     categories: list[CategoryRow] = field(default_factory=list)
 
     def retail(self) -> CategoryRow | None:
@@ -86,12 +87,17 @@ def _get_json(session: requests.Session, url: str, params: dict[str, str]) -> An
     return response.json()
 
 
-def _parse_curve(payload: Any) -> tuple[str, str, float | None]:
-    """Return (company, timestamp, peak cumulative quantity) from the demand curve."""
+def _parse_curve(payload: Any) -> tuple[str, str, float | None, float | None]:
+    """Return (company, timestamp, peak cumulative qty, cut-off qty) from the demand curve.
+
+    The curve is aggregate across all categories; NSE publishes no per-category ladder.
+    Only retail and employees may bid at cut-off, so that row approximates retail demand.
+    """
     rows = payload.get("dataList", payload) if isinstance(payload, dict) else payload
     company = ""
     timestamp = ""
     peak: float | None = None
+    cutoff: float | None = None
 
     for row in rows or []:
         if not isinstance(row, dict):
@@ -99,10 +105,14 @@ def _parse_curve(payload: Any) -> tuple[str, str, float | None]:
         company = company or str(row.get("company") or "").strip()
         timestamp = timestamp or str(row.get("timestamp") or "").strip()
         qty = _to_float(row.get("cumQty"))
-        if qty is not None and (peak is None or qty > peak):
+        if qty is None:
+            continue
+        if str(row.get("price") or "").strip().lower() == "cut-off":
+            cutoff = qty
+        if peak is None or qty > peak:
             peak = qty
 
-    return company, timestamp, peak
+    return company, timestamp, peak, cutoff
 
 
 def _parse_categories(payload: Any) -> list[CategoryRow]:
@@ -144,12 +154,13 @@ def fetch_snapshot(symbol: str, exchange: str = "ALL", retries: int = 3) -> Dema
             time.sleep(2 * (attempt + 1))
             continue
 
-        company, timestamp, peak = _parse_curve(curve)
+        company, timestamp, peak, cutoff = _parse_curve(curve)
         return DemandSnapshot(
             symbol=symbol,
             company=company,
             update_time=timestamp,
             total_shares_bid=peak,
+            cutoff_shares_bid=cutoff,
             categories=_parse_categories(categories),
         )
 

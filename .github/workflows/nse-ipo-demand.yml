@@ -2,8 +2,9 @@ name: NSE IPO Demand Tracker
 
 on:
   schedule:
-    # Every 15 minutes. GitHub cron is UTC; the job itself stamps IST timestamps.
-    - cron: "*/15 * * * *"
+    # Every 15 min during the 09:00-19:00 IST bidding window (UTC = IST - 5:30).
+    # Hours 3-13 UTC cover 08:30-19:15 IST; the job stamps IST timestamps itself.
+    - cron: "*/15 3-13 * * 1-5"
   workflow_dispatch:
     inputs:
       symbol:
