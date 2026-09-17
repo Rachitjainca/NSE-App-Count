@@ -38,6 +38,24 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # Reports presence and length only; never echoes secret values.
+      - name: Check configuration
+        env:
+          GSHEET_ID: ${{ secrets.GSHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GCHAT_WEBHOOK_URL: ${{ secrets.GCHAT_WEBHOOK_URL }}
+          RETAIL_LOT_SIZE_VAR: ${{ vars.RETAIL_LOT_SIZE }}
+        run: |
+          for name in GSHEET_ID GOOGLE_SERVICE_ACCOUNT_JSON GCHAT_WEBHOOK_URL; do
+            value="${!name}"
+            if [ -z "$value" ]; then
+              echo "MISSING  $name (secret not visible to this job)"
+            else
+              echo "ok       $name (${#value} chars)"
+            fi
+          done
+          echo "vars.RETAIL_LOT_SIZE = '${RETAIL_LOT_SIZE_VAR}'"
+
       - name: Fetch demand and publish
         env:
           IPO_SYMBOL: ${{ inputs.symbol || vars.IPO_SYMBOL || 'NSE' }}
