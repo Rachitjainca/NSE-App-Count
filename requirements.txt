@@ -1,0 +1,4 @@
+requests>=2.32.0
+gspread>=6.1.2
+google-auth>=2.32.0
+tzdata>=2024.1

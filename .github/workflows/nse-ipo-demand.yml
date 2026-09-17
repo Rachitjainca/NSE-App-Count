@@ -1,0 +1,50 @@
+name: NSE IPO Demand Tracker
+
+on:
+  schedule:
+    # Every 15 minutes. GitHub cron is UTC; the job itself stamps IST timestamps.
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      symbol:
+        description: "IPO symbol to track"
+        required: false
+        default: "NSE"
+      lot_size:
+        description: "Retail lot size (for estimated application count)"
+        required: false
+        default: "0"
+
+concurrency:
+  group: nse-ipo-demand
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  fetch-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Fetch demand and publish
+        env:
+          IPO_SYMBOL: ${{ inputs.symbol || vars.IPO_SYMBOL || 'NSE' }}
+          IPO_EXCHANGE: ${{ vars.IPO_EXCHANGE || 'ALL' }}
+          RETAIL_LOT_SIZE: ${{ inputs.lot_size || vars.RETAIL_LOT_SIZE || '0' }}
+          GSHEET_ID: ${{ secrets.GSHEET_ID }}
+          GSHEET_WORKSHEET: ${{ vars.GSHEET_WORKSHEET || 'IPO Demand' }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GCHAT_WEBHOOK_URL: ${{ secrets.GCHAT_WEBHOOK_URL }}
+          GCHAT_THREAD_KEY: ${{ vars.GCHAT_THREAD_KEY }}
+        run: python src/main.py
