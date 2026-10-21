@@ -91,17 +91,19 @@ quotas may bid at cut-off — NII/HNI may not.
 Retail/Employee/Shareholder split into Cut-off/Price bid; bHNI/sHNI only have `Total`
 since NII cannot bid at cut-off.
 
-**`IPO Price Ladder`** — one row per discrete bid price on the aggregate demand curve
-(all categories combined; NSE does not publish a per-category price ladder):
+**`IPO Price Ladder`** — 3 rows per fetch, bucketing the aggregate demand curve (all
+categories combined; NSE does not publish a per-category price ladder):
 
 `fetched_at_ist`, `symbol`, `company`, `nse_update_time`, `price`, `cum_qty`,
 `qty_at_price`
 
-`price` is a numeric price string or `Cut-off`. `cum_qty` is cumulative demand at that
-price-or-higher (blank for `Cut-off`, which is a separate bucket, not part of the
-cumulative chain). `qty_at_price` is the incremental demand bucketed at exactly that
-price — in practice this is usually dominated by the cap-price row, since most bids
-cluster at cut-off/cap; the long tail toward the floor price is typically small.
+`price` is one of `Cut-off`, `Cap ₹<price>` (the price-band cap), or `Below cap` (every
+lower price, summed). NSE's raw curve lists a long tail of discrete prices below the
+cap with near-zero increments — most bids cluster at cut-off/cap — so these 3 buckets
+are more useful than one row per price. `cum_qty` is cumulative demand at/above that
+bucket (blank for `Cut-off`, a separate pool — NII/HNI can't use it, only Retail/
+Employee/Shareholder can). `qty_at_price` is the bucket's own quantity; `Cap` +
+`Below cap` sum to the total priced (non-cut-off) demand.
 
 All three sheets' header rows are written automatically on first run.
 

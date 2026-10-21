@@ -93,11 +93,13 @@ class CategoryRow:
 
 @dataclass
 class PriceLevel:
-    """One price point on the aggregate demand curve (all categories combined)."""
+    """One of 3 demand-curve buckets (all categories combined): Cut-off, At-cap, or
+    Below-cap. See `_parse_price_ladder` for why it's 3 buckets, not every price.
+    """
 
-    price: str  # a numeric price string, or "Cut-off"
-    cum_qty: float | None  # cumulative demand at this price-or-higher (None for Cut-off)
-    qty_at_price: float | None  # incremental demand bucketed at this exact price point
+    price: str  # "Cut-off", "Cap ₹<price>", or "Below cap"
+    cum_qty: float | None  # cumulative demand at/above this bucket (None for Cut-off)
+    qty_at_price: float | None  # this bucket's own quantity
 
 
 @dataclass
@@ -186,16 +188,20 @@ def _parse_curve(payload: Any) -> tuple[str, str, float | None, float | None]:
 
 
 def _parse_price_ladder(payload: Any) -> list[PriceLevel]:
-    """Bucket the demand curve by bid price.
+    """Bucket the demand curve into 3 buckets: Cut-off, At the price-band cap, and
+    Below cap (every lower price, summed).
 
     `cumQty` is cumulative demand at that price-or-higher as price descends from the
     cap; "Cut-off" is a separate bucket (bids that chose cut-off, not part of the
-    cumulative price chain). Incremental demand at each price = its cumQty minus the
-    previous, higher price's cumQty.
+    cumulative price chain). NSE's full per-price ladder has a long tail of near-zero
+    increments below the cap (most bids cluster at cut-off/cap), so a 3-bucket view is
+    more useful than listing every discrete price.
     """
     rows = payload.get("dataList", payload) if isinstance(payload, dict) else payload
-    levels: list[PriceLevel] = []
-    prev_cum = 0.0
+    cutoff_qty: float | None = None
+    cap_price: str | None = None
+    cap_qty: float | None = None
+    last_qty: float | None = None
 
     for row in rows or []:
         if not isinstance(row, dict):
@@ -205,10 +211,18 @@ def _parse_price_ladder(payload: Any) -> list[PriceLevel]:
         if not price or price == "-" or cum_qty is None:
             continue
         if price.lower() == "cut-off":
-            levels.append(PriceLevel(price="Cut-off", cum_qty=None, qty_at_price=cum_qty))
+            cutoff_qty = cum_qty
             continue
-        levels.append(PriceLevel(price=price, cum_qty=cum_qty, qty_at_price=cum_qty - prev_cum))
-        prev_cum = cum_qty
+        if cap_price is None:
+            cap_price = price
+            cap_qty = cum_qty
+        last_qty = cum_qty
+
+    levels = [PriceLevel(price="Cut-off", cum_qty=None, qty_at_price=cutoff_qty)]
+    if cap_price is not None:
+        below_cap_qty = (last_qty - cap_qty) if (last_qty is not None and cap_qty is not None) else None
+        levels.append(PriceLevel(price=f"Cap ₹{cap_price}", cum_qty=cap_qty, qty_at_price=cap_qty))
+        levels.append(PriceLevel(price="Below cap", cum_qty=last_qty, qty_at_price=below_cap_qty))
 
     return levels
 
