@@ -12,11 +12,15 @@ Data sources:
   vs. cumulative-quantity demand curve, and the authoritative NSE update timestamp.
   `exchange=ALL` can lag behind a single exchange before both order books are merged,
   so the client tries `ALL`, then `NSE`, then `BSE`, and keeps whichever has real data.
-- `https://www.nseindia.com/api/ipo-bid-details?symbol=<SYMBOL>&series=<SERIES>` —
-  consolidated, category-wise bid details (QIB / NII / Retail / Employees /
+- `https://www.nseindia.com/api/ipo-active-category?symbol=<SYMBOL>` — consolidated,
+  ALL-exchange category-wise bid details (QIB / NII / Retail / Employees /
   Shareholders), including a Cut-off vs. Price-bid split for Retail/Employee/
-  Shareholder. This replaces the older `ipo-active-category` endpoint, which returns
-  an empty "Total: 0" shell for newer IPOs and is no longer used by NSE's own page.
+  Shareholder. This is what the live issue-information page's "Consolidated Bid
+  Details" view renders (confirmed: its totals match the `ipo-chart-demand`
+  ALL-exchange curve almost exactly). It returns an empty "Total: 0" shell before
+  trading opens for the day, so `ipo-bid-details?symbol=<SYMBOL>&series=<SERIES>`
+  (same shape, NSE-exchange-only scale, roughly 30-45% smaller once both exchanges
+  are live) is used as a same-shape fallback when that happens.
 
 ## Layout
 
@@ -51,7 +55,7 @@ Set under `Settings → Secrets and variables → Actions → Variables`:
 | --- | --- | --- |
 | `IPO_SYMBOL` | `JPL` | IPO symbol to track |
 | `IPO_EXCHANGE` | `ALL` | `ALL`, `NSE`, or `BSE`; falls back automatically if empty |
-| `IPO_SERIES` | `EQ` | Series param required by `ipo-bid-details` |
+| `IPO_SERIES` | `EQ` | Series param required by the `ipo-bid-details` fallback |
 | `RETAIL_LOT_SIZE` | `12` | Retail lot size in shares; applications = shares bid ÷ lot size |
 | `EMPLOYEE_LOT_SIZE` | *(= retail)* | Employee-quota lot size override |
 | `SHAREHOLDER_LOT_SIZE` | *(= retail)* | Shareholder-quota lot size override |
