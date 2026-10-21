@@ -7,6 +7,7 @@ import requests
 from nse import DemandSnapshot
 
 GROUP_LABELS = {
+    "QIB": "QIB",
     "Retail": "Retail (RII)",
     "Employee": "Employees",
     "Shareholder": "Shareholders",

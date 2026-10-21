@@ -92,10 +92,10 @@ convenience.
 `fetched_at_ist`, `symbol`, `company`, `nse_update_time`, `group`, `bucket`,
 `shares_offered`, `shares_bid`, `subscription_times`, `est_applications`
 
-`group` is one of `Retail`, `Employee`, `Shareholder`, `bHNI` (NII bidding >₹10L),
+`group` is one of `QIB`, `Retail`, `Employee`, `Shareholder`, `bHNI` (NII bidding >₹10L),
 `sHNI` (NII bidding ₹2L–10L). `bucket` is `Total`, `Cut-off`, or `Price bid` — only
-Retail/Employee/Shareholder split into Cut-off/Price bid; bHNI/sHNI only have `Total`
-since NII cannot bid at cut-off.
+Retail/Employee/Shareholder split into Cut-off/Price bid; QIB/bHNI/sHNI only have
+`Total` since institutional/NII bids cannot be placed at cut-off.
 
 **`IPO Price Ladder`** — 3 rows per fetch, bucketing the aggregate demand curve (all
 categories combined; NSE does not publish a per-category price ladder):

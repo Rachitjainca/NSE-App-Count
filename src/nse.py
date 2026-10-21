@@ -40,9 +40,10 @@ HEADERS = {
 WARMUP_PATHS = ["/", "/market-data/all-upcoming-issues-ipo"]
 
 # Reserved-category groups that can be bucketed by bid type (Retail/Employee/Shareholder
-# may bid at cut-off; bHNI/sHNI bid at a specific price only), keyed by the bid-details
-# API's top-level `srNo` (e.g. "3(a)" for a Retail sub-row still roots to "3").
+# may bid at cut-off; QIB/bHNI/sHNI bid at a specific price only), keyed by the
+# bid-details API's top-level `srNo` (e.g. "3(a)" for a Retail sub-row still roots to "3").
 GROUP_BY_SR_ROOT = {
+    "1": "QIB",
     "3": "Retail",
     "4": "Employee",
     "5": "Shareholder",
