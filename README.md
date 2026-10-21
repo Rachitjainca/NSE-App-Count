@@ -113,11 +113,14 @@ can dry-run the fetch on its own.
 
 ## Notes
 
-- GitHub's scheduled runners are best-effort; a `*/15` cron can drift by several
-  minutes under load.
-- The schedule runs every 15 minutes between 09:00 and 19:00 IST on weekdays
-  (`*/15 3-13 * * 1-5` in UTC), matching NSE's bidding window. Use **Run workflow**
-  for an off-schedule run.
+- GitHub's `schedule` trigger is unreliable at 15-minute granularity in practice — a
+  `*/15` cron was observed firing only every 4-7 hours instead. The workflow now fires
+  hourly instead (`5 3-13 * * 1-5` UTC, i.e. ~08:35-19:20 IST, offset 5 min past the
+  hour to dodge GitHub's documented top-of-hour congestion) and loops the fetch/publish
+  step 4x internally with deterministic ~14.5-minute sleeps, which is far more reliable
+  than depending on GitHub to fire four separate 15-minute ticks.
+- Use **Run workflow** for an off-schedule run; set its `iterations` input above `1` to
+  test the internal loop without waiting for the next hourly tick.
 - NSE occasionally rate-limits; the client warms up cookies and retries three times.
 - `est_applications` is an estimate (shares bid ÷ lot size) filled in for Retail,
   Employee, Shareholder, bHNI, and sHNI rows/buckets once the relevant lot-size

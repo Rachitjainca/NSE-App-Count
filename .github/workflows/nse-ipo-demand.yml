@@ -2,9 +2,12 @@ name: NSE IPO Demand Tracker
 
 on:
   schedule:
-    # Every 15 min during the 09:00-19:00 IST bidding window (UTC = IST - 5:30).
-    # Hours 3-13 UTC cover 08:30-19:15 IST; the job stamps IST timestamps itself.
-    - cron: "*/15 3-13 * * 1-5"
+    # GitHub's `schedule` trigger is unreliable at 15-minute granularity in practice
+    # (observed 4-7 hour gaps despite a `*/15` cron) — it fires far more reliably once
+    # per hour. So we fire hourly and loop 4x internally with deterministic sleeps to
+    # get real ~15-minute delivery. Offset 5 min past the hour to dodge GitHub's
+    # documented top-of-hour congestion. Hours 3-13 UTC cover ~08:35-19:20 IST.
+    - cron: "5 3-13 * * 1-5"
   workflow_dispatch:
     inputs:
       symbol:
@@ -15,6 +18,10 @@ on:
         description: "Retail lot size (for estimated application count)"
         required: false
         default: "12"
+      iterations:
+        description: "How many ~15-min-spaced fetch/publish cycles to run this call"
+        required: false
+        default: "1"
 
 concurrency:
   group: nse-ipo-demand
@@ -26,7 +33,7 @@ permissions:
 jobs:
   fetch-and-publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
 
@@ -56,7 +63,7 @@ jobs:
           done
           echo "vars.RETAIL_LOT_SIZE = '${RETAIL_LOT_SIZE_VAR}'"
 
-      - name: Fetch demand and publish
+      - name: Fetch demand and publish (looped every ~15 min for this hour)
         env:
           IPO_SYMBOL: ${{ inputs.symbol || vars.IPO_SYMBOL || 'JPL' }}
           IPO_EXCHANGE: ${{ vars.IPO_EXCHANGE || 'ALL' }}
@@ -71,4 +78,14 @@ jobs:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           GCHAT_WEBHOOK_URL: ${{ secrets.GCHAT_WEBHOOK_URL }}
           GCHAT_THREAD_KEY: ${{ vars.GCHAT_THREAD_KEY }}
-        run: python src/main.py
+          RUNS: ${{ github.event_name == 'schedule' && '4' || inputs.iterations || '1' }}
+        run: |
+          set -e
+          for i in $(seq 1 "$RUNS"); do
+            echo "::group::Cycle $i of $RUNS"
+            python src/main.py
+            echo "::endgroup::"
+            if [ "$i" -lt "$RUNS" ]; then
+              sleep 870  # ~14.5 min; leaves headroom under the 55-min job timeout
+            fi
+          done
