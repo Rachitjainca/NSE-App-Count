@@ -93,13 +93,11 @@ class CategoryRow:
 
 @dataclass
 class PriceLevel:
-    """One of 3 demand-curve buckets (all categories combined): Cut-off, At-cap, or
-    Below-cap. See `_parse_price_ladder` for why it's 3 buckets, not every price.
-    """
+    """One price point on the aggregate demand curve (all categories combined)."""
 
-    price: str  # "Cut-off", "Cap ₹<price>", or "Below cap"
-    cum_qty: float | None  # cumulative demand at/above this bucket (None for Cut-off)
-    qty_at_price: float | None  # this bucket's own quantity
+    price: str  # a numeric price string, or "Cut-off"
+    cum_qty: float | None  # cumulative demand at this price-or-higher (None for Cut-off)
+    qty_at_price: float | None  # incremental demand bucketed at this exact price point
 
 
 @dataclass
@@ -125,6 +123,29 @@ class DemandSnapshot:
                 continue
             buckets.setdefault(row.group, {})[row.bucket] = row
         return buckets
+
+    def price_summary(self) -> list[PriceLevel]:
+        """Collapse the full per-price ladder into 3 buckets: Cut-off, At-cap, Below-cap.
+
+        NSE's raw curve has a long tail of discrete prices below the cap with
+        near-zero increments (most bids cluster at cut-off/cap), so this summary is
+        more useful for a quick read than the full ladder (which is still kept as-is
+        in `price_ladder` / the IPO Price Ladder sheet for history).
+        """
+        cutoff = next((lvl for lvl in self.price_ladder if lvl.price == "Cut-off"), None)
+        priced = [lvl for lvl in self.price_ladder if lvl.price != "Cut-off"]
+        levels = [cutoff] if cutoff else []
+        if not priced:
+            return levels
+        cap, floor = priced[0], priced[-1]
+        below_cap_qty = (
+            floor.cum_qty - cap.cum_qty
+            if floor.cum_qty is not None and cap.cum_qty is not None
+            else None
+        )
+        levels.append(PriceLevel(price=f"Cap ₹{cap.price}", cum_qty=cap.cum_qty, qty_at_price=cap.cum_qty))
+        levels.append(PriceLevel(price="Below cap", cum_qty=floor.cum_qty, qty_at_price=below_cap_qty))
+        return levels
 
 
 def build_session() -> requests.Session:
@@ -188,20 +209,17 @@ def _parse_curve(payload: Any) -> tuple[str, str, float | None, float | None]:
 
 
 def _parse_price_ladder(payload: Any) -> list[PriceLevel]:
-    """Bucket the demand curve into 3 buckets: Cut-off, At the price-band cap, and
-    Below cap (every lower price, summed).
+    """Bucket the demand curve by bid price.
 
     `cumQty` is cumulative demand at that price-or-higher as price descends from the
     cap; "Cut-off" is a separate bucket (bids that chose cut-off, not part of the
-    cumulative price chain). NSE's full per-price ladder has a long tail of near-zero
-    increments below the cap (most bids cluster at cut-off/cap), so a 3-bucket view is
-    more useful than listing every discrete price.
+    cumulative price chain). Incremental demand at each price = its cumQty minus the
+    previous, higher price's cumQty. Kept at full per-price detail for the sheet;
+    `DemandSnapshot.price_summary()` collapses this to 3 buckets for the Chat message.
     """
     rows = payload.get("dataList", payload) if isinstance(payload, dict) else payload
-    cutoff_qty: float | None = None
-    cap_price: str | None = None
-    cap_qty: float | None = None
-    last_qty: float | None = None
+    levels: list[PriceLevel] = []
+    prev_cum = 0.0
 
     for row in rows or []:
         if not isinstance(row, dict):
@@ -211,18 +229,10 @@ def _parse_price_ladder(payload: Any) -> list[PriceLevel]:
         if not price or price == "-" or cum_qty is None:
             continue
         if price.lower() == "cut-off":
-            cutoff_qty = cum_qty
+            levels.append(PriceLevel(price="Cut-off", cum_qty=None, qty_at_price=cum_qty))
             continue
-        if cap_price is None:
-            cap_price = price
-            cap_qty = cum_qty
-        last_qty = cum_qty
-
-    levels = [PriceLevel(price="Cut-off", cum_qty=None, qty_at_price=cutoff_qty)]
-    if cap_price is not None:
-        below_cap_qty = (last_qty - cap_qty) if (last_qty is not None and cap_qty is not None) else None
-        levels.append(PriceLevel(price=f"Cap ₹{cap_price}", cum_qty=cap_qty, qty_at_price=cap_qty))
-        levels.append(PriceLevel(price="Below cap", cum_qty=last_qty, qty_at_price=below_cap_qty))
+        levels.append(PriceLevel(price=price, cum_qty=cum_qty, qty_at_price=cum_qty - prev_cum))
+        prev_cum = cum_qty
 
     return levels
 

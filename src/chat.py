@@ -86,18 +86,19 @@ def build_message(
     if snapshot.total_shares_bid is not None:
         lines.append(f"_Total shares bid (demand curve): {_fmt_num(snapshot.total_shares_bid)}_")
 
-    if snapshot.price_ladder:
+    price_summary = snapshot.price_summary()
+    if price_summary:
         # "Below cap"'s cum_qty is the total priced (non-cut-off) demand; use it as the
         # percentage base so Cap + Below cap sum to 100%. Cut-off is a separate pool
         # (not priced), so it gets no percentage.
-        total = next((lvl.cum_qty for lvl in snapshot.price_ladder if lvl.price == "Below cap"), None)
+        total = next((lvl.cum_qty for lvl in price_summary if lvl.price == "Below cap"), None)
         price_rows = [
             [
                 lvl.price,
                 _fmt_num(lvl.qty_at_price),
                 _fmt_pct(lvl.qty_at_price, total) if lvl.price != "Cut-off" else "-",
             ]
-            for lvl in snapshot.price_ladder
+            for lvl in price_summary
         ]
         lines.append("")
         lines.append("*Bid-price curve*")
