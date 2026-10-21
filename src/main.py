@@ -162,9 +162,14 @@ def main() -> int:
 
     webhook = _env("GCHAT_WEBHOOK_URL")
     if webhook:
+        sheet_url = (
+            f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit"
+            if spreadsheet_id
+            else None
+        )
         chat.post_message(
             webhook,
-            chat.build_message(snapshot, fetched_at, lot_sizes),
+            chat.build_message(snapshot, fetched_at, lot_sizes, sheet_url),
             thread_key=_env("GCHAT_THREAD_KEY") or None,
         )
         print("Posted update to Google Chat space.")

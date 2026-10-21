@@ -46,6 +46,7 @@ def build_message(
     snapshot: DemandSnapshot,
     fetched_at: str,
     lot_sizes: dict[str, float] | None = None,
+    sheet_url: str | None = None,
 ) -> str:
     lot_sizes = lot_sizes or {}
     buckets = snapshot.bucket_rows()
@@ -102,7 +103,10 @@ def build_message(
         lines.append("")
         lines.append(f"*Bid-price curve*: {len(priced)} prices, ₹{floor.price}–₹{cap.price}")
         lines.append(_table(["Bucket", "Qty", "% of total"], price_rows))
-        lines.append("_Full per-price bucketing: see the 'IPO Price Ladder' sheet_")
+
+    if sheet_url:
+        lines.append("")
+        lines.append(f"<{sheet_url}|Full data in Google Sheets>")
 
     return "\n".join(lines)
 
