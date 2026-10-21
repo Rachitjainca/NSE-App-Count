@@ -25,6 +25,12 @@ def _fmt_times(value: float | None) -> str:
     return "-" if value is None else f"{value:,.2f}x"
 
 
+def _fmt_pct(part: float | None, whole: float | None) -> str:
+    if part is None or not whole:
+        return "-"
+    return f"{part / whole * 100:.1f}%"
+
+
 def build_message(
     snapshot: DemandSnapshot,
     fetched_at: str,
@@ -46,18 +52,16 @@ def build_message(
         total = rows.get("Total")
         lines.append(f"*{label}: {_fmt_times(total.subscription_times) if total else '-'}*")
         if total:
-            lines.append(f"  • Shares bid: {_fmt_num(total.shares_bid)}")
-            lines.append(f"  • Shares offered: {_fmt_num(total.shares_offered)}")
             lot_size = lot_sizes.get(group, 0)
             if lot_size:
                 applications = (total.shares_bid or 0) / lot_size if total.shares_bid else None
                 if applications is not None:
                     lines.append(f"  • Est. applications: {_fmt_num(round(applications))}")
         cutoff, price_bid = rows.get("Cut-off"), rows.get("Price bid")
-        if cutoff or price_bid:
+        if (cutoff or price_bid) and total and total.shares_bid:
             lines.append(
-                f"  • Cut-off: {_fmt_num(cutoff.shares_bid if cutoff else None)} | "
-                f"Price bid: {_fmt_num(price_bid.shares_bid if price_bid else None)}"
+                f"  • Cut-off: {_fmt_pct(cutoff.shares_bid if cutoff else None, total.shares_bid)} | "
+                f"Price bid: {_fmt_pct(price_bid.shares_bid if price_bid else None, total.shares_bid)}"
             )
         lines.append("")
 
