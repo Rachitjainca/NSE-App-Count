@@ -25,6 +25,7 @@ HEADER = [
     "subscription_times",
     "est_applications",
     "cutoff_shares_bid",
+    "overall_subscription_times",
 ]
 
 # One row per (reserved-category group, bid-price bucket), e.g. Retail/Cut-off.

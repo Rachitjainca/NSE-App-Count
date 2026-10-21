@@ -54,6 +54,7 @@ def build_message(
     lines = [
         f"*IPO Demand — {snapshot.company or snapshot.symbol} ({snapshot.symbol})*",
         f"_NSE update: {snapshot.update_time or 'n/a'} | fetched: {fetched_at} IST_",
+        f"*Overall subscription: {_fmt_times(snapshot.overall_subscription_times)}*",
         "",
     ]
 

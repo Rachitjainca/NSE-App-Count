@@ -110,6 +110,7 @@ class DemandSnapshot:
     update_time: str
     total_shares_bid: float | None
     cutoff_shares_bid: float | None = None
+    overall_subscription_times: float | None = None
     categories: list[CategoryRow] = field(default_factory=list)
     price_ladder: list[PriceLevel] = field(default_factory=list)
 
@@ -264,20 +265,30 @@ def _rows_to_categories(
     return categories
 
 
-def _parse_active_category(payload: Any) -> list[CategoryRow]:
+def _total_subscription_times(rows: list[Any], times_key: str) -> float | None:
+    """Read the overall subscription multiple off the API's own 'Total' summary row."""
+    for row in rows or []:
+        if isinstance(row, dict) and str(row.get("category") or "").strip() == "Total":
+            return _to_float(row.get(times_key))
+    return None
+
+
+def _parse_active_category(payload: Any) -> tuple[list[CategoryRow], float | None]:
     """Parse `ipo-active-category`: `{"dataList": [...], "updateTime": ...}` (ALL-exchange)."""
     rows = payload.get("dataList", []) if isinstance(payload, dict) else (payload or [])
-    return _rows_to_categories(
+    categories = _rows_to_categories(
         rows, offered_key="noOfShareOffered", bid_key="noOfSharesBid", times_key="noOfTotalMeant"
     )
+    return categories, _total_subscription_times(rows, "noOfTotalMeant")
 
 
-def _parse_bid_details(payload: Any) -> list[CategoryRow]:
+def _parse_bid_details(payload: Any) -> tuple[list[CategoryRow], float | None]:
     """Parse `ipo-bid-details`: `{"data": [...], "updateTime": ...}` (NSE-exchange-only)."""
     rows = payload.get("data", []) if isinstance(payload, dict) else (payload or [])
-    return _rows_to_categories(
+    categories = _rows_to_categories(
         rows, offered_key="noOfSharesOffered", bid_key="noOfsharesBid", times_key="noOfTime"
     )
+    return categories, _total_subscription_times(rows, "noOfTime")
 
 
 def fetch_snapshot(
@@ -297,13 +308,13 @@ def fetch_snapshot(
                 if peak is not None:
                     break
 
-            categories = _parse_active_category(
+            categories, overall_times = _parse_active_category(
                 _get_json(session, CATEGORY_URL, {"symbol": symbol})
             )
             if not categories:
                 # ipo-active-category is empty before today's trading window opens;
                 # ipo-bid-details has the same shape but is NSE-exchange-only scale.
-                categories = _parse_bid_details(
+                categories, overall_times = _parse_bid_details(
                     _get_json(session, BID_DETAILS_URL, {"symbol": symbol, "series": series})
                 )
         except (requests.RequestException, ValueError) as exc:
@@ -318,6 +329,7 @@ def fetch_snapshot(
             total_shares_bid=peak,
             cutoff_shares_bid=cutoff,
             categories=categories,
+            overall_subscription_times=overall_times,
             price_ladder=_parse_price_ladder(curve),
         )
 

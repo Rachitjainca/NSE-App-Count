@@ -51,6 +51,9 @@ def build_rows(
                 row.subscription_times if row.subscription_times is not None else "",
                 round(applications) if applications is not None else "",
                 snapshot.cutoff_shares_bid if snapshot.cutoff_shares_bid is not None else "",
+                snapshot.overall_subscription_times
+                if snapshot.overall_subscription_times is not None
+                else "",
             ]
         )
     return rows

@@ -79,11 +79,13 @@ Set under `Settings → Secrets and variables → Actions → Variables`:
 
 `fetched_at_ist`, `symbol`, `company`, `nse_update_time`, `sr_no`, `category`,
 `shares_offered`, `shares_bid`, `subscription_times`, `est_applications`,
-`cutoff_shares_bid`
+`cutoff_shares_bid`, `overall_subscription_times`
 
 `cutoff_shares_bid` is the aggregate quantity bid at cut-off price across the whole
 issue (demand-curve endpoint; not per category). Retail, Employee, and Shareholder
-quotas may bid at cut-off — NII/HNI may not.
+quotas may bid at cut-off — NII/HNI may not. `overall_subscription_times` is the
+whole-issue subscription multiple (NSE's own "Total" row), repeated on every row for
+convenience.
 
 **`IPO Bid Buckets`** — one row per (reserved-category group, bid-price bucket):
 
