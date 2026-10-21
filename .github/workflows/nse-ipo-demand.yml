@@ -75,6 +75,7 @@ jobs:
           GSHEET_ID: ${{ secrets.GSHEET_ID }}
           GSHEET_WORKSHEET: ${{ vars.GSHEET_WORKSHEET || 'IPO Demand' }}
           GSHEET_BUCKET_WORKSHEET: ${{ vars.GSHEET_BUCKET_WORKSHEET || 'IPO Bid Buckets' }}
+          GSHEET_PRICE_LADDER_WORKSHEET: ${{ vars.GSHEET_PRICE_LADDER_WORKSHEET || 'IPO Price Ladder' }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           GCHAT_WEBHOOK_URL: ${{ secrets.GCHAT_WEBHOOK_URL }}
           GCHAT_THREAD_KEY: ${{ vars.GCHAT_THREAD_KEY }}

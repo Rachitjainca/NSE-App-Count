@@ -92,6 +92,15 @@ class CategoryRow:
 
 
 @dataclass
+class PriceLevel:
+    """One price point on the aggregate demand curve (all categories combined)."""
+
+    price: str  # a numeric price string, or "Cut-off"
+    cum_qty: float | None  # cumulative demand at this price-or-higher (None for Cut-off)
+    qty_at_price: float | None  # incremental demand bucketed at this exact price point
+
+
+@dataclass
 class DemandSnapshot:
     symbol: str
     company: str
@@ -99,6 +108,7 @@ class DemandSnapshot:
     total_shares_bid: float | None
     cutoff_shares_bid: float | None = None
     categories: list[CategoryRow] = field(default_factory=list)
+    price_ladder: list[PriceLevel] = field(default_factory=list)
 
     def retail(self) -> CategoryRow | None:
         return next(
@@ -175,6 +185,34 @@ def _parse_curve(payload: Any) -> tuple[str, str, float | None, float | None]:
     return company, timestamp, peak, cutoff
 
 
+def _parse_price_ladder(payload: Any) -> list[PriceLevel]:
+    """Bucket the demand curve by bid price.
+
+    `cumQty` is cumulative demand at that price-or-higher as price descends from the
+    cap; "Cut-off" is a separate bucket (bids that chose cut-off, not part of the
+    cumulative price chain). Incremental demand at each price = its cumQty minus the
+    previous, higher price's cumQty.
+    """
+    rows = payload.get("dataList", payload) if isinstance(payload, dict) else payload
+    levels: list[PriceLevel] = []
+    prev_cum = 0.0
+
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        price = str(row.get("price") or "").strip()
+        cum_qty = _to_float(row.get("cumQty"))
+        if not price or price == "-" or cum_qty is None:
+            continue
+        if price.lower() == "cut-off":
+            levels.append(PriceLevel(price="Cut-off", cum_qty=None, qty_at_price=cum_qty))
+            continue
+        levels.append(PriceLevel(price=price, cum_qty=cum_qty, qty_at_price=cum_qty - prev_cum))
+        prev_cum = cum_qty
+
+    return levels
+
+
 def _parse_categories(payload: Any) -> list[CategoryRow]:
     """Parse the `ipo-bid-details` response: `{"data": [...], "updateTime": ...}`."""
     rows = payload.get("data", []) if isinstance(payload, dict) else (payload or [])
@@ -210,7 +248,7 @@ def fetch_snapshot(
     for attempt in range(retries):
         session = build_session()
         try:
-            company, timestamp, peak, cutoff = "", "", None, None
+            company, timestamp, peak, cutoff, curve = "", "", None, None, None
             exchanges_to_try = [exchange] + [e for e in EXCHANGE_FALLBACKS if e != exchange]
             for ex in exchanges_to_try:
                 curve = _get_json(session, DEMAND_URL, {"symbol": symbol, "exchange": ex})
@@ -232,6 +270,7 @@ def fetch_snapshot(
             total_shares_bid=peak,
             cutoff_shares_bid=cutoff,
             categories=_parse_categories(categories),
+            price_ladder=_parse_price_ladder(curve),
         )
 
     raise RuntimeError(f"Failed to fetch NSE demand for {symbol}: {last_error}")

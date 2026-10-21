@@ -58,6 +58,7 @@ Set under `Settings → Secrets and variables → Actions → Variables`:
 | `HNI_LOT_SIZE` | *(= retail)* | bHNI/sHNI lot-multiple size override |
 | `GSHEET_WORKSHEET` | `IPO Demand` | Per-category worksheet tab name (created automatically) |
 | `GSHEET_BUCKET_WORKSHEET` | `IPO Bid Buckets` | Bid-price bucket worksheet tab name (created automatically) |
+| `GSHEET_PRICE_LADDER_WORKSHEET` | `IPO Price Ladder` | Per-price demand-curve worksheet tab name (created automatically) |
 | `GCHAT_THREAD_KEY` | *(unset)* | Set to e.g. the symbol to keep all updates in one Chat thread |
 
 ## Google Sheets access
@@ -89,7 +90,19 @@ quotas may bid at cut-off — NII/HNI may not.
 Retail/Employee/Shareholder split into Cut-off/Price bid; bHNI/sHNI only have `Total`
 since NII cannot bid at cut-off.
 
-Both sheets' header rows are written automatically on first run.
+**`IPO Price Ladder`** — one row per discrete bid price on the aggregate demand curve
+(all categories combined; NSE does not publish a per-category price ladder):
+
+`fetched_at_ist`, `symbol`, `company`, `nse_update_time`, `price`, `cum_qty`,
+`qty_at_price`
+
+`price` is a numeric price string or `Cut-off`. `cum_qty` is cumulative demand at that
+price-or-higher (blank for `Cut-off`, which is a separate bucket, not part of the
+cumulative chain). `qty_at_price` is the incremental demand bucketed at exactly that
+price — in practice this is usually dominated by the cap-price row, since most bids
+cluster at cut-off/cap; the long tail toward the floor price is typically small.
+
+All three sheets' header rows are written automatically on first run.
 
 ## Run locally
 

@@ -41,6 +41,17 @@ BUCKET_HEADER = [
     "est_applications",
 ]
 
+# One row per discrete bid price on the aggregate demand curve (all categories combined).
+PRICE_LADDER_HEADER = [
+    "fetched_at_ist",
+    "symbol",
+    "company",
+    "nse_update_time",
+    "price",
+    "cum_qty",
+    "qty_at_price",
+]
+
 
 def _client(service_account_json: str) -> gspread.Client:
     info = json.loads(service_account_json)
@@ -89,3 +100,12 @@ def append_bucket_rows(
     rows: Sequence[Sequence[object]],
 ) -> None:
     _append(service_account_json, spreadsheet_id, worksheet_name, rows, BUCKET_HEADER)
+
+
+def append_price_ladder_rows(
+    service_account_json: str,
+    spreadsheet_id: str,
+    worksheet_name: str,
+    rows: Sequence[Sequence[object]],
+) -> None:
+    _append(service_account_json, spreadsheet_id, worksheet_name, rows, PRICE_LADDER_HEADER)

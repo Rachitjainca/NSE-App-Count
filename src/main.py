@@ -84,6 +84,26 @@ def build_bucket_rows(
     return rows
 
 
+def build_price_ladder_rows(snapshot: DemandSnapshot, fetched_at: str) -> list[list[object]]:
+    """One row per discrete bid price on the aggregate demand curve (all categories
+    combined; NSE does not publish a per-category price ladder).
+    """
+    rows: list[list[object]] = []
+    for level in snapshot.price_ladder:
+        rows.append(
+            [
+                fetched_at,
+                snapshot.symbol,
+                snapshot.company,
+                snapshot.update_time,
+                level.price,
+                level.cum_qty if level.cum_qty is not None else "",
+                level.qty_at_price if level.qty_at_price is not None else "",
+            ]
+        )
+    return rows
+
+
 def main() -> int:
     symbol = _env("IPO_SYMBOL", "JPL")
     exchange = _env("IPO_EXCHANGE", "ALL")
@@ -108,6 +128,7 @@ def main() -> int:
 
     rows = build_rows(snapshot, fetched_at, lot_sizes)
     bucket_rows = build_bucket_rows(snapshot, fetched_at, lot_sizes)
+    price_ladder_rows = build_price_ladder_rows(snapshot, fetched_at)
 
     spreadsheet_id = _env("GSHEET_ID")
     service_account = _env("GOOGLE_SERVICE_ACCOUNT_JSON")
@@ -127,6 +148,14 @@ def main() -> int:
                 bucket_rows,
             )
             print(f"Appended {len(bucket_rows)} bucket row(s) to Google Sheet.")
+        if price_ladder_rows:
+            sheets.append_price_ladder_rows(
+                service_account,
+                spreadsheet_id,
+                _env("GSHEET_PRICE_LADDER_WORKSHEET", "IPO Price Ladder"),
+                price_ladder_rows,
+            )
+            print(f"Appended {len(price_ladder_rows)} price-ladder row(s) to Google Sheet.")
     else:
         print("Google Sheets not configured; skipping sheet update.")
 

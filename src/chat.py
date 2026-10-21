@@ -71,6 +71,23 @@ def build_message(
         lines.append("")
         lines.append(f"_Total shares bid (demand curve): {_fmt_num(snapshot.total_shares_bid)}_")
 
+    priced = [lvl for lvl in snapshot.price_ladder if lvl.price != "Cut-off"]
+    if priced:
+        cap, floor = priced[0], priced[-1]
+        total = floor.cum_qty
+        cap_pct = (
+            f" ({cap.qty_at_price / total * 100:.1f}% of total)"
+            if total and cap.qty_at_price is not None
+            else ""
+        )
+        cutoff = next((lvl for lvl in snapshot.price_ladder if lvl.price == "Cut-off"), None)
+        lines.append("")
+        lines.append(f"*Bid-price curve*: {len(priced)} prices, ₹{floor.price}–₹{cap.price}")
+        lines.append(f"  • At cap ₹{cap.price}: {_fmt_num(cap.qty_at_price)}{cap_pct}")
+        if cutoff:
+            lines.append(f"  • Cut-off bucket: {_fmt_num(cutoff.qty_at_price)}")
+        lines.append("  • Full per-price bucketing: see the 'IPO Price Ladder' sheet")
+
     return "\n".join(lines)
 
 
