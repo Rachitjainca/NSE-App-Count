@@ -65,14 +65,7 @@ def build_message(
             )
         lines.append("")
 
-    lines.append("*All categories*")
-    for row in snapshot.categories:
-        if not row.is_top_level:
-            continue
-        lines.append(f"  • {row.category}: {_fmt_times(row.subscription_times)}")
-
     if snapshot.total_shares_bid is not None:
-        lines.append("")
         lines.append(f"_Total shares bid (demand curve): {_fmt_num(snapshot.total_shares_bid)}_")
 
     priced = [lvl for lvl in snapshot.price_ladder if lvl.price != "Cut-off"]
