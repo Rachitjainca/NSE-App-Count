@@ -31,6 +31,17 @@ def _fmt_pct(part: float | None, whole: float | None) -> str:
     return f"{part / whole * 100:.1f}%"
 
 
+def _table(headers: list[str], rows: list[list[str]]) -> str:
+    """Render as a fixed-width table inside a monospace block (Chat has no HTML tables)."""
+    widths = [max(len(r[i]) for r in [headers, *rows]) for i in range(len(headers))]
+    sep = ["-" * w for w in widths]
+
+    def fmt_row(row: list[str]) -> str:
+        return "  ".join(cell.ljust(w) for cell, w in zip(row, widths))
+
+    return "```\n" + "\n".join(fmt_row(r) for r in [headers, sep, *rows]) + "\n```"
+
+
 def build_message(
     snapshot: DemandSnapshot,
     fetched_at: str,
@@ -45,24 +56,30 @@ def build_message(
         "",
     ]
 
+    group_rows: list[list[str]] = []
     for group, label in GROUP_LABELS.items():
         rows = buckets.get(group)
         if not rows:
             continue
         total = rows.get("Total")
-        lines.append(f"*{label}: {_fmt_times(total.subscription_times) if total else '-'}*")
-        if total:
-            lot_size = lot_sizes.get(group, 0)
-            if lot_size:
-                applications = (total.shares_bid or 0) / lot_size if total.shares_bid else None
-                if applications is not None:
-                    lines.append(f"  • Est. applications: {_fmt_num(round(applications))}")
         cutoff, price_bid = rows.get("Cut-off"), rows.get("Price bid")
-        if (cutoff or price_bid) and total and total.shares_bid:
-            lines.append(
-                f"  • Cut-off: {_fmt_pct(cutoff.shares_bid if cutoff else None, total.shares_bid)} | "
-                f"Price bid: {_fmt_pct(price_bid.shares_bid if price_bid else None, total.shares_bid)}"
-            )
+        applications = "-"
+        lot_size = lot_sizes.get(group, 0)
+        if total and lot_size and total.shares_bid:
+            applications = _fmt_num(round(total.shares_bid / lot_size))
+        group_rows.append(
+            [
+                label,
+                _fmt_times(total.subscription_times) if total else "-",
+                _fmt_pct(cutoff.shares_bid if cutoff else None, total.shares_bid if total else None),
+                _fmt_pct(price_bid.shares_bid if price_bid else None, total.shares_bid if total else None),
+                applications,
+            ]
+        )
+    if group_rows:
+        lines.append(
+            _table(["Group", "Sub(x)", "Cut-off%", "Price-bid%", "Applications"], group_rows)
+        )
         lines.append("")
 
     if snapshot.total_shares_bid is not None:
@@ -72,18 +89,20 @@ def build_message(
     if priced:
         cap, floor = priced[0], priced[-1]
         total = floor.cum_qty
-        cap_pct = (
-            f" ({cap.qty_at_price / total * 100:.1f}% of total)"
-            if total and cap.qty_at_price is not None
-            else ""
-        )
         cutoff = next((lvl for lvl in snapshot.price_ladder if lvl.price == "Cut-off"), None)
+        price_rows = [
+            [
+                f"Cap ₹{cap.price}",
+                _fmt_num(cap.qty_at_price),
+                _fmt_pct(cap.qty_at_price, total),
+            ]
+        ]
+        if cutoff:
+            price_rows.append(["Cut-off", _fmt_num(cutoff.qty_at_price), "-"])
         lines.append("")
         lines.append(f"*Bid-price curve*: {len(priced)} prices, ₹{floor.price}–₹{cap.price}")
-        lines.append(f"  • At cap ₹{cap.price}: {_fmt_num(cap.qty_at_price)}{cap_pct}")
-        if cutoff:
-            lines.append(f"  • Cut-off bucket: {_fmt_num(cutoff.qty_at_price)}")
-        lines.append("  • Full per-price bucketing: see the 'IPO Price Ladder' sheet")
+        lines.append(_table(["Bucket", "Qty", "% of total"], price_rows))
+        lines.append("_Full per-price bucketing: see the 'IPO Price Ladder' sheet_")
 
     return "\n".join(lines)
 
