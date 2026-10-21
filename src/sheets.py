@@ -27,6 +27,20 @@ HEADER = [
     "cutoff_shares_bid",
 ]
 
+# One row per (reserved-category group, bid-price bucket), e.g. Retail/Cut-off.
+BUCKET_HEADER = [
+    "fetched_at_ist",
+    "symbol",
+    "company",
+    "nse_update_time",
+    "group",
+    "bucket",
+    "shares_offered",
+    "shares_bid",
+    "subscription_times",
+    "est_applications",
+]
+
 
 def _client(service_account_json: str) -> gspread.Client:
     info = json.loads(service_account_json)
@@ -34,11 +48,12 @@ def _client(service_account_json: str) -> gspread.Client:
     return gspread.authorize(creds)
 
 
-def append_rows(
+def _append(
     service_account_json: str,
     spreadsheet_id: str,
     worksheet_name: str,
     rows: Sequence[Sequence[object]],
+    header: Sequence[str],
 ) -> None:
     if not rows:
         return
@@ -47,12 +62,30 @@ def append_rows(
     try:
         worksheet = sheet.worksheet(worksheet_name)
     except gspread.WorksheetNotFound:
-        worksheet = sheet.add_worksheet(title=worksheet_name, rows=1000, cols=len(HEADER))
+        worksheet = sheet.add_worksheet(title=worksheet_name, rows=1000, cols=len(header))
 
     if not worksheet.get_all_values():
-        worksheet.append_row(HEADER, value_input_option="USER_ENTERED")
+        worksheet.append_row(list(header), value_input_option="USER_ENTERED")
 
     worksheet.append_rows(
         [list(row) for row in rows],
         value_input_option="USER_ENTERED",
     )
+
+
+def append_rows(
+    service_account_json: str,
+    spreadsheet_id: str,
+    worksheet_name: str,
+    rows: Sequence[Sequence[object]],
+) -> None:
+    _append(service_account_json, spreadsheet_id, worksheet_name, rows, HEADER)
+
+
+def append_bucket_rows(
+    service_account_json: str,
+    spreadsheet_id: str,
+    worksheet_name: str,
+    rows: Sequence[Sequence[object]],
+) -> None:
+    _append(service_account_json, spreadsheet_id, worksheet_name, rows, BUCKET_HEADER)

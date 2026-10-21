@@ -1,16 +1,22 @@
 # NSE IPO Demand Tracker
 
 Polls the NSE IPO APIs every 15 minutes, appends each category snapshot (with an IST
-timestamp) to a Google Sheet, and posts a summary — highlighting the Retail (RII)
-status — to the **NSE IPO Industry Count** Google Chat space.
+timestamp) to a Google Sheet, appends a bid-price bucket breakdown (Retail / Employee /
+Shareholder / bHNI / sHNI) to a second sheet, and posts a summary to the
+**NSE IPO Industry Count** Google Chat space. Currently tracking **Jio Platforms
+Limited (JPL)** — retail lot size is 12 shares.
 
 Data sources:
 
-- `https://www.nseindia.com/api/ipo-chart-demand?symbol=<SYMBOL>&exchange=ALL` — price
+- `https://www.nseindia.com/api/ipo-chart-demand?symbol=<SYMBOL>&exchange=<EX>` — price
   vs. cumulative-quantity demand curve, and the authoritative NSE update timestamp.
-- `https://www.nseindia.com/api/ipo-active-category?symbol=<SYMBOL>` — category-wise
-  live bid status (QIB / NII / Retail / Employees), which is where the retail numbers
-  come from. The chart-demand endpoint alone does not break demand down by category.
+  `exchange=ALL` can lag behind a single exchange before both order books are merged,
+  so the client tries `ALL`, then `NSE`, then `BSE`, and keeps whichever has real data.
+- `https://www.nseindia.com/api/ipo-bid-details?symbol=<SYMBOL>&series=<SERIES>` —
+  consolidated, category-wise bid details (QIB / NII / Retail / Employees /
+  Shareholders), including a Cut-off vs. Price-bid split for Retail/Employee/
+  Shareholder. This replaces the older `ipo-active-category` endpoint, which returns
+  an empty "Total: 0" shell for newer IPOs and is no longer used by NSE's own page.
 
 ## Layout
 
@@ -43,10 +49,15 @@ Set under `Settings → Secrets and variables → Actions → Variables`:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `IPO_SYMBOL` | `NSE` | IPO symbol to track |
-| `IPO_EXCHANGE` | `ALL` | `ALL`, `NSE`, or `BSE` |
-| `RETAIL_LOT_SIZE` | `0` | Retail lot size in shares; when set, estimated applications = retail shares bid ÷ lot size |
-| `GSHEET_WORKSHEET` | `IPO Demand` | Worksheet tab name (created automatically) |
+| `IPO_SYMBOL` | `JPL` | IPO symbol to track |
+| `IPO_EXCHANGE` | `ALL` | `ALL`, `NSE`, or `BSE`; falls back automatically if empty |
+| `IPO_SERIES` | `EQ` | Series param required by `ipo-bid-details` |
+| `RETAIL_LOT_SIZE` | `12` | Retail lot size in shares; applications = shares bid ÷ lot size |
+| `EMPLOYEE_LOT_SIZE` | *(= retail)* | Employee-quota lot size override |
+| `SHAREHOLDER_LOT_SIZE` | *(= retail)* | Shareholder-quota lot size override |
+| `HNI_LOT_SIZE` | *(= retail)* | bHNI/sHNI lot-multiple size override |
+| `GSHEET_WORKSHEET` | `IPO Demand` | Per-category worksheet tab name (created automatically) |
+| `GSHEET_BUCKET_WORKSHEET` | `IPO Bid Buckets` | Bid-price bucket worksheet tab name (created automatically) |
 | `GCHAT_THREAD_KEY` | *(unset)* | Set to e.g. the symbol to keep all updates in one Chat thread |
 
 ## Google Sheets access
@@ -57,16 +68,28 @@ Set under `Settings → Secrets and variables → Actions → Variables`:
 
 ## Sheet columns
 
+**`IPO Demand`** — one row per category (including NSE's sub-categories such as `2.1`,
+`1(a)`):
+
 `fetched_at_ist`, `symbol`, `company`, `nse_update_time`, `sr_no`, `category`,
 `shares_offered`, `shares_bid`, `subscription_times`, `est_applications`,
 `cutoff_shares_bid`
 
-One row per category (including NSE's sub-categories such as `2.1`, `1(a)`). The
-header row is written automatically on first run.
+`cutoff_shares_bid` is the aggregate quantity bid at cut-off price across the whole
+issue (demand-curve endpoint; not per category). Retail, Employee, and Shareholder
+quotas may bid at cut-off — NII/HNI may not.
 
-`cutoff_shares_bid` is the aggregate quantity bid at cut-off price. NSE publishes no
-per-category price ladder, so there is no retail-specific bid price; only retail and
-employees may bid at cut-off, making this a close proxy for retail demand.
+**`IPO Bid Buckets`** — one row per (reserved-category group, bid-price bucket):
+
+`fetched_at_ist`, `symbol`, `company`, `nse_update_time`, `group`, `bucket`,
+`shares_offered`, `shares_bid`, `subscription_times`, `est_applications`
+
+`group` is one of `Retail`, `Employee`, `Shareholder`, `bHNI` (NII bidding >₹10L),
+`sHNI` (NII bidding ₹2L–10L). `bucket` is `Total`, `Cut-off`, or `Price bid` — only
+Retail/Employee/Shareholder split into Cut-off/Price bid; bHNI/sHNI only have `Total`
+since NII cannot bid at cut-off.
+
+Both sheets' header rows are written automatically on first run.
 
 ## Run locally
 
@@ -75,8 +98,9 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
-$env:IPO_SYMBOL = "NSE"
-$env:RETAIL_LOT_SIZE = "0"
+$env:IPO_SYMBOL = "JPL"
+$env:IPO_SERIES = "EQ"
+$env:RETAIL_LOT_SIZE = "12"
 $env:GCHAT_WEBHOOK_URL = "<webhook url>"
 $env:GSHEET_ID = "<spreadsheet id>"
 $env:GOOGLE_SERVICE_ACCOUNT_JSON = Get-Content .\service-account.json -Raw
@@ -95,5 +119,6 @@ can dry-run the fetch on its own.
   (`*/15 3-13 * * 1-5` in UTC), matching NSE's bidding window. Use **Run workflow**
   for an off-schedule run.
 - NSE occasionally rate-limits; the client warms up cookies and retries three times.
-- `est_applications` is an estimate (retail shares bid ÷ lot size) and is only filled
-  in when `RETAIL_LOT_SIZE` is configured.
+- `est_applications` is an estimate (shares bid ÷ lot size) filled in for Retail,
+  Employee, Shareholder, bHNI, and sHNI rows/buckets once the relevant lot-size
+  variable is configured (all default to `RETAIL_LOT_SIZE` if unset).

@@ -4,7 +4,15 @@ from __future__ import annotations
 
 import requests
 
-from nse import CategoryRow, DemandSnapshot
+from nse import DemandSnapshot
+
+GROUP_LABELS = {
+    "Retail": "Retail (RII)",
+    "Employee": "Employees",
+    "Shareholder": "Shareholders",
+    "bHNI": "bHNI (NII > ₹10L)",
+    "sHNI": "sHNI (NII ₹2L–10L)",
+}
 
 
 def _fmt_num(value: float | None) -> str:
@@ -20,9 +28,10 @@ def _fmt_times(value: float | None) -> str:
 def build_message(
     snapshot: DemandSnapshot,
     fetched_at: str,
-    retail_applications: float | None,
+    lot_sizes: dict[str, float] | None = None,
 ) -> str:
-    retail: CategoryRow | None = snapshot.retail()
+    lot_sizes = lot_sizes or {}
+    buckets = snapshot.bucket_rows()
 
     lines = [
         f"*IPO Demand — {snapshot.company or snapshot.symbol} ({snapshot.symbol})*",
@@ -30,20 +39,31 @@ def build_message(
         "",
     ]
 
-    if retail:
-        lines.append(f"*Retail (RII): {_fmt_times(retail.subscription_times)}*")
-        lines.append(f"  • Shares bid: {_fmt_num(retail.shares_bid)}")
-        lines.append(f"  • Shares offered: {_fmt_num(retail.shares_offered)}")
-        if retail_applications is not None:
-            lines.append(f"  • Est. applications: {_fmt_num(retail_applications)}")
-        if snapshot.cutoff_shares_bid is not None:
-            lines.append(f"  • Bid at cut-off (incl. employees): {_fmt_num(snapshot.cutoff_shares_bid)}")
+    for group, label in GROUP_LABELS.items():
+        rows = buckets.get(group)
+        if not rows:
+            continue
+        total = rows.get("Total")
+        lines.append(f"*{label}: {_fmt_times(total.subscription_times) if total else '-'}*")
+        if total:
+            lines.append(f"  • Shares bid: {_fmt_num(total.shares_bid)}")
+            lines.append(f"  • Shares offered: {_fmt_num(total.shares_offered)}")
+            lot_size = lot_sizes.get(group, 0)
+            if lot_size:
+                applications = (total.shares_bid or 0) / lot_size if total.shares_bid else None
+                if applications is not None:
+                    lines.append(f"  • Est. applications: {_fmt_num(round(applications))}")
+        cutoff, price_bid = rows.get("Cut-off"), rows.get("Price bid")
+        if cutoff or price_bid:
+            lines.append(
+                f"  • Cut-off: {_fmt_num(cutoff.shares_bid if cutoff else None)} | "
+                f"Price bid: {_fmt_num(price_bid.shares_bid if price_bid else None)}"
+            )
         lines.append("")
 
     lines.append("*All categories*")
     for row in snapshot.categories:
-        # Sub-categories use sr_no like "2.1" or "1(a)"; show only top-level rows.
-        if not row.sr_no.isdigit():
+        if not row.is_top_level:
             continue
         lines.append(f"  • {row.category}: {_fmt_times(row.subscription_times)}")
 

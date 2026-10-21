@@ -10,11 +10,11 @@ on:
       symbol:
         description: "IPO symbol to track"
         required: false
-        default: "NSE"
+        default: "JPL"
       lot_size:
         description: "Retail lot size (for estimated application count)"
         required: false
-        default: "0"
+        default: "12"
 
 concurrency:
   group: nse-ipo-demand
@@ -58,11 +58,16 @@ jobs:
 
       - name: Fetch demand and publish
         env:
-          IPO_SYMBOL: ${{ inputs.symbol || vars.IPO_SYMBOL || 'NSE' }}
+          IPO_SYMBOL: ${{ inputs.symbol || vars.IPO_SYMBOL || 'JPL' }}
           IPO_EXCHANGE: ${{ vars.IPO_EXCHANGE || 'ALL' }}
-          RETAIL_LOT_SIZE: ${{ inputs.lot_size || vars.RETAIL_LOT_SIZE || '0' }}
+          IPO_SERIES: ${{ vars.IPO_SERIES || 'EQ' }}
+          RETAIL_LOT_SIZE: ${{ inputs.lot_size || vars.RETAIL_LOT_SIZE || '12' }}
+          EMPLOYEE_LOT_SIZE: ${{ vars.EMPLOYEE_LOT_SIZE }}
+          SHAREHOLDER_LOT_SIZE: ${{ vars.SHAREHOLDER_LOT_SIZE }}
+          HNI_LOT_SIZE: ${{ vars.HNI_LOT_SIZE }}
           GSHEET_ID: ${{ secrets.GSHEET_ID }}
           GSHEET_WORKSHEET: ${{ vars.GSHEET_WORKSHEET || 'IPO Demand' }}
+          GSHEET_BUCKET_WORKSHEET: ${{ vars.GSHEET_BUCKET_WORKSHEET || 'IPO Bid Buckets' }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           GCHAT_WEBHOOK_URL: ${{ secrets.GCHAT_WEBHOOK_URL }}
           GCHAT_THREAD_KEY: ${{ vars.GCHAT_THREAD_KEY }}

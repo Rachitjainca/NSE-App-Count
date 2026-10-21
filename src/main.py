@@ -27,14 +27,17 @@ def _estimated_applications(shares_bid: float | None, lot_size: float) -> float 
     return shares_bid / lot_size
 
 
+def _lot_size_for_group(group: str | None, lot_sizes: dict[str, float]) -> float:
+    return lot_sizes.get(group or "", 0)
+
+
 def build_rows(
-    snapshot: DemandSnapshot, fetched_at: str, lot_size: float
+    snapshot: DemandSnapshot, fetched_at: str, lot_sizes: dict[str, float]
 ) -> list[list[object]]:
     rows: list[list[object]] = []
     for row in snapshot.categories:
-        applications = (
-            _estimated_applications(row.shares_bid, lot_size) if row.is_retail else None
-        )
+        lot_size = _lot_size_for_group(row.group, lot_sizes)
+        applications = _estimated_applications(row.shares_bid, lot_size)
         rows.append(
             [
                 fetched_at,
@@ -53,19 +56,58 @@ def build_rows(
     return rows
 
 
+def build_bucket_rows(
+    snapshot: DemandSnapshot, fetched_at: str, lot_sizes: dict[str, float]
+) -> list[list[object]]:
+    """One row per (group, bid-price bucket): Retail/Shareholder/Employee split by
+    Cut-off vs Price bid, and bHNI/sHNI as a single Total bucket (no cut-off allowed).
+    """
+    rows: list[list[object]] = []
+    for group, buckets in snapshot.bucket_rows().items():
+        lot_size = _lot_size_for_group(group, lot_sizes)
+        for bucket_label, row in buckets.items():
+            applications = _estimated_applications(row.shares_bid, lot_size)
+            rows.append(
+                [
+                    fetched_at,
+                    snapshot.symbol,
+                    snapshot.company,
+                    snapshot.update_time,
+                    group,
+                    bucket_label,
+                    row.shares_offered if row.shares_offered is not None else "",
+                    row.shares_bid if row.shares_bid is not None else "",
+                    row.subscription_times if row.subscription_times is not None else "",
+                    round(applications) if applications is not None else "",
+                ]
+            )
+    return rows
+
+
 def main() -> int:
-    symbol = _env("IPO_SYMBOL", "NSE")
+    symbol = _env("IPO_SYMBOL", "JPL")
     exchange = _env("IPO_EXCHANGE", "ALL")
-    lot_size = float(_env("RETAIL_LOT_SIZE", "0") or 0)
+    series = _env("IPO_SERIES", "EQ")
+    retail_lot_size = float(_env("RETAIL_LOT_SIZE", "12") or 0)
+    # Employee/Shareholder quotas conventionally share the retail lot size for this IPO;
+    # NII/HNI bid in multiples of the retail lot too, so it doubles as their lot size.
+    lot_sizes = {
+        "Retail": retail_lot_size,
+        "Employee": float(_env("EMPLOYEE_LOT_SIZE", "") or retail_lot_size),
+        "Shareholder": float(_env("SHAREHOLDER_LOT_SIZE", "") or retail_lot_size),
+        "bHNI": float(_env("HNI_LOT_SIZE", "") or retail_lot_size),
+        "sHNI": float(_env("HNI_LOT_SIZE", "") or retail_lot_size),
+    }
 
     fetched_at = datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S")
-    snapshot = fetch_snapshot(symbol, exchange)
+    snapshot = fetch_snapshot(symbol, exchange, series)
 
     if not snapshot.categories:
         print(f"No demand data returned for {symbol}; nothing to publish.")
         return 0
 
-    rows = build_rows(snapshot, fetched_at, lot_size)
+    rows = build_rows(snapshot, fetched_at, lot_sizes)
+    bucket_rows = build_bucket_rows(snapshot, fetched_at, lot_sizes)
 
     spreadsheet_id = _env("GSHEET_ID")
     service_account = _env("GOOGLE_SERVICE_ACCOUNT_JSON")
@@ -77,22 +119,22 @@ def main() -> int:
             rows,
         )
         print(f"Appended {len(rows)} row(s) to Google Sheet.")
+        if bucket_rows:
+            sheets.append_bucket_rows(
+                service_account,
+                spreadsheet_id,
+                _env("GSHEET_BUCKET_WORKSHEET", "IPO Bid Buckets"),
+                bucket_rows,
+            )
+            print(f"Appended {len(bucket_rows)} bucket row(s) to Google Sheet.")
     else:
         print("Google Sheets not configured; skipping sheet update.")
 
     webhook = _env("GCHAT_WEBHOOK_URL")
     if webhook:
-        retail = snapshot.retail()
-        applications = (
-            _estimated_applications(retail.shares_bid, lot_size) if retail else None
-        )
         chat.post_message(
             webhook,
-            chat.build_message(
-                snapshot,
-                fetched_at,
-                round(applications) if applications is not None else None,
-            ),
+            chat.build_message(snapshot, fetched_at, lot_sizes),
             thread_key=_env("GCHAT_THREAD_KEY") or None,
         )
         print("Posted update to Google Chat space.")
