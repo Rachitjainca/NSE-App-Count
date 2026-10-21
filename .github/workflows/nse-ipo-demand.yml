@@ -71,7 +71,8 @@ jobs:
           RETAIL_LOT_SIZE: ${{ inputs.lot_size || vars.RETAIL_LOT_SIZE || '12' }}
           EMPLOYEE_LOT_SIZE: ${{ vars.EMPLOYEE_LOT_SIZE }}
           SHAREHOLDER_LOT_SIZE: ${{ vars.SHAREHOLDER_LOT_SIZE }}
-          HNI_LOT_SIZE: ${{ vars.HNI_LOT_SIZE }}
+          BHNI_LOT_SIZE: ${{ vars.BHNI_LOT_SIZE }}
+          SHNI_LOT_SIZE: ${{ vars.SHNI_LOT_SIZE }}
           GSHEET_ID: ${{ secrets.GSHEET_ID }}
           GSHEET_WORKSHEET: ${{ vars.GSHEET_WORKSHEET || 'IPO Demand' }}
           GSHEET_BUCKET_WORKSHEET: ${{ vars.GSHEET_BUCKET_WORKSHEET || 'IPO Bid Buckets' }}

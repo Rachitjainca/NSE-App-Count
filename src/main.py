@@ -109,14 +109,15 @@ def main() -> int:
     exchange = _env("IPO_EXCHANGE", "ALL")
     series = _env("IPO_SERIES", "EQ")
     retail_lot_size = float(_env("RETAIL_LOT_SIZE", "12") or 0)
-    # Employee/Shareholder quotas conventionally share the retail lot size for this IPO;
-    # NII/HNI bid in multiples of the retail lot too, so it doubles as their lot size.
+    # Employee/Shareholder quotas conventionally share the retail lot size for this IPO.
+    # bHNI/sHNI apply in much larger minimum lot multiples (to clear the >Rs10L / Rs2L-10L
+    # thresholds): 900 and 180 shares respectively for this IPO's 12-share retail lot.
     lot_sizes = {
         "Retail": retail_lot_size,
         "Employee": float(_env("EMPLOYEE_LOT_SIZE", "") or retail_lot_size),
         "Shareholder": float(_env("SHAREHOLDER_LOT_SIZE", "") or retail_lot_size),
-        "bHNI": float(_env("HNI_LOT_SIZE", "") or retail_lot_size),
-        "sHNI": float(_env("HNI_LOT_SIZE", "") or retail_lot_size),
+        "bHNI": float(_env("BHNI_LOT_SIZE", "") or 900),
+        "sHNI": float(_env("SHNI_LOT_SIZE", "") or 180),
     }
 
     fetched_at = datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S")

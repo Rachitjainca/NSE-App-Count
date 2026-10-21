@@ -55,7 +55,8 @@ Set under `Settings → Secrets and variables → Actions → Variables`:
 | `RETAIL_LOT_SIZE` | `12` | Retail lot size in shares; applications = shares bid ÷ lot size |
 | `EMPLOYEE_LOT_SIZE` | *(= retail)* | Employee-quota lot size override |
 | `SHAREHOLDER_LOT_SIZE` | *(= retail)* | Shareholder-quota lot size override |
-| `HNI_LOT_SIZE` | *(= retail)* | bHNI/sHNI lot-multiple size override |
+| `BHNI_LOT_SIZE` | `900` | bHNI minimum application size in shares (75 lots of 12 for this IPO) |
+| `SHNI_LOT_SIZE` | `180` | sHNI minimum application size in shares (15 lots of 12 for this IPO) |
 | `GSHEET_WORKSHEET` | `IPO Demand` | Per-category worksheet tab name (created automatically) |
 | `GSHEET_BUCKET_WORKSHEET` | `IPO Bid Buckets` | Bid-price bucket worksheet tab name (created automatically) |
 | `GSHEET_PRICE_LADDER_WORKSHEET` | `IPO Price Ladder` | Per-price demand-curve worksheet tab name (created automatically) |
